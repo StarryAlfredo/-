@@ -1,139 +1,144 @@
 import React, { useRef, useEffect } from 'react';
 import { THEME_COLORS } from '../constants';
 
+/**
+ * Pure JavaScript Class for Canvas Rendering.
+ * Strictly decoupled from React logic to ensure performance and simplicity.
+ */
+class GridRenderer {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private animationId: number = 0;
+  private time: number = 0;
+  private width: number = 0;
+  private height: number = 0;
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error("Could not get 2D context");
+    this.ctx = context;
+    
+    this.resize();
+    window.addEventListener('resize', this.resize.bind(this));
+  }
+
+  private resize() {
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.canvas.width = this.width;
+    this.canvas.height = this.height;
+  }
+
+  public start() {
+    this.animate();
+  }
+
+  public stop() {
+    cancelAnimationFrame(this.animationId);
+    window.removeEventListener('resize', this.resize.bind(this));
+  }
+
+  private animate() {
+    this.render();
+    this.animationId = requestAnimationFrame(this.animate.bind(this));
+  }
+
+  private render() {
+    this.time += 0.015;
+    
+    // Clear Background
+    this.ctx.fillStyle = THEME_COLORS.bg;
+    this.ctx.fillRect(0, 0, this.width, this.height);
+
+    // Grid Settings
+    const fov = 350;
+    const viewY = -150;
+    const gridSize = 60; // Spacing
+    const rows = 30;
+    const cols = 40;
+    const speed = 80; // Movement speed
+
+    this.ctx.lineWidth = 1.5;
+    this.ctx.lineCap = 'round';
+
+    // Helper to project 3D point to 2D
+    const project = (x: number, y: number, z: number) => {
+      const scale = fov / (fov + z);
+      return {
+        x: (x * scale) + this.width / 2,
+        y: (y * scale) + this.height / 2,
+        scale: scale
+      };
+    };
+
+    // Draw Vertical Lines
+    for (let i = -cols; i <= cols; i++) {
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = i === 0 ? THEME_COLORS.gridHighlight : THEME_COLORS.grid;
+      
+      for (let j = 0; j < rows; j++) {
+        // Z moves towards us, modulo for infinite loop
+        const z = (j * gridSize) - (this.time * speed) % gridSize + 100;
+        const x = i * gridSize;
+        // Wavy effect
+        const y = viewY + Math.sin((x + this.time * 200) * 0.002) * 20;
+
+        const p = project(x, y, z);
+        
+        if (z > 0) {
+           if (j === 0) this.ctx.moveTo(p.x, p.y);
+           else this.ctx.lineTo(p.x, p.y);
+        }
+      }
+      this.ctx.stroke();
+    }
+
+    // Draw Horizontal Lines
+    for (let j = 0; j < rows; j++) {
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = THEME_COLORS.grid;
+
+      // Calculate Z for this row
+      const zBase = (j * gridSize) - (this.time * speed) % gridSize + 100;
+      if (zBase <= 0) continue;
+
+      let first = true;
+      for (let i = -cols; i <= cols; i++) {
+        const x = i * gridSize;
+        const y = viewY + Math.sin((x + this.time * 200) * 0.002) * 20;
+        const p = project(x, y, zBase);
+
+        if (first) {
+            this.ctx.moveTo(p.x, p.y);
+            first = false;
+        } else {
+            this.ctx.lineTo(p.x, p.y);
+        }
+      }
+      
+      // Distance Fade
+      const alpha = Math.max(0, 1 - zBase / (rows * gridSize * 0.6));
+      this.ctx.globalAlpha = alpha;
+      this.ctx.stroke();
+      this.ctx.globalAlpha = 1.0;
+    }
+  }
+}
+
 const FlowingGrid: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<GridRenderer | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvasRef.current) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animationFrameId: number;
-    let time = 0;
-
-    // Grid configuration
-    const gridSize = 40; // Size of grid cells
-    const horizon = canvas.height * 0.4; // Where the "horizon" is
-    const speed = 0.02;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-
-    const draw = () => {
-      // Clear with a slight fade for trail effect (optional, but clean clear is better for grid)
-      ctx.fillStyle = '#0f0505'; // Very dark background
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const width = canvas.width;
-      const height = canvas.height;
-      
-      // Perspective parameters
-      const fov = 300;
-      const viewY = -100; // Camera height offset
-
-      ctx.strokeStyle = THEME_COLORS.grid;
-      ctx.lineWidth = 1;
-      ctx.lineCap = 'round';
-
-      time += speed;
-
-      ctx.beginPath();
-
-      // We draw a grid on the X-Z plane and project it to 2D
-      // Z moves from near (bottom of screen) to far (horizon)
-      
-      const cols = 40;
-      const rows = 40;
-      const spacing = 100;
-
-      // Draw Vertical Lines
-      for (let x = -cols; x <= cols; x++) {
-        // Calculate the base X position in 3D space
-        const x3d = x * spacing;
-        
-        ctx.moveTo(0, 0); // Temporary move, will be overwritten by first point
-
-        let firstPoint = true;
-
-        for (let z = 0; z < rows; z++) {
-            // Move Z towards the camera (or away). Let's move away.
-            // Add time to Z to make it flow forward
-            const currentZ = (z * spacing) - (time * 100) % spacing;
-            const z3d = currentZ + 200; // Push it forward so it's in front of camera
-
-            if (z3d <= 0) continue; // Behind camera
-
-            // Create a wave effect on Y (height)
-            const dist = Math.sqrt(x3d*x3d + z3d*z3d);
-            const y3d = Math.sin(dist * 0.005 - time * 2) * 30 + viewY;
-
-            // Project to 2D
-            const scale = fov / (fov + z3d);
-            const x2d = (x3d * scale) + width / 2;
-            const y2d = (y3d * scale) + height / 2;
-
-            if (firstPoint) {
-                ctx.moveTo(x2d, y2d);
-                firstPoint = false;
-            } else {
-                ctx.lineTo(x2d, y2d);
-            }
-        }
-      }
-
-      // Draw Horizontal Lines
-      for (let z = 0; z < rows; z++) {
-        const currentZ = (z * spacing) - (time * 100) % spacing;
-        const z3d = currentZ + 200;
-
-        if (z3d <= 0) continue;
-
-        ctx.moveTo(0,0);
-        let firstPoint = true;
-
-        for (let x = -cols; x <= cols; x++) {
-            const x3d = x * spacing;
-
-            // Same wave logic
-            const dist = Math.sqrt(x3d*x3d + z3d*z3d);
-            const y3d = Math.sin(dist * 0.005 - time * 2) * 30 + viewY;
-
-             // Project to 2D
-             const scale = fov / (fov + z3d);
-             const x2d = (x3d * scale) + width / 2;
-             const y2d = (y3d * scale) + height / 2;
-
-            if (firstPoint) {
-                ctx.moveTo(x2d, y2d);
-                firstPoint = false;
-            } else {
-                ctx.lineTo(x2d, y2d);
-            }
-        }
-      }
-
-      // Add a glow effect
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = THEME_COLORS.primary;
-      
-      ctx.stroke();
-      ctx.shadowBlur = 0; // Reset
-
-      animationFrameId = requestAnimationFrame(draw);
-    };
-
-    window.addEventListener('resize', resize);
-    resize();
-    draw();
+    // Initialize pure JS renderer
+    rendererRef.current = new GridRenderer(canvasRef.current);
+    rendererRef.current.start();
 
     return () => {
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animationFrameId);
+      rendererRef.current?.stop();
     };
   }, []);
 

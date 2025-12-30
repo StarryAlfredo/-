@@ -1,4 +1,5 @@
 import React from 'react';
+import { THEME_COLORS } from '../constants';
 
 interface NextButtonProps {
   onClick: () => void;
@@ -8,17 +9,22 @@ interface NextButtonProps {
 const NextButton: React.FC<NextButtonProps> = ({ onClick, visible }) => {
   return (
     <div 
-      className={`fixed bottom-10 left-0 w-full flex justify-center transition-all duration-1000 transform ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}
+      className={`fixed bottom-12 left-0 w-full flex justify-center transition-all duration-1000 transform ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}
     >
       <button
         onClick={onClick}
-        className="group relative px-8 py-3 bg-transparent overflow-hidden rounded-full border border-rose-400/50 hover:border-rose-400 transition-all duration-300"
+        className="group relative px-10 py-4 bg-transparent overflow-hidden transition-all duration-300"
       >
-         <div className="absolute inset-0 w-0 bg-rose-600/20 transition-all duration-[250ms] ease-out group-hover:w-full opacity-0 group-hover:opacity-100"></div>
-         <span className="relative text-rose-100 font-serif-display text-lg tracking-widest group-hover:text-white transition-colors">
-            ENTER NEXT PAGE
+         {/* Border Container */}
+         <div className="absolute inset-0 border border-[#d4af37] opacity-50 rounded-sm"></div>
+         <div className="absolute inset-[3px] border border-[#d4af37] opacity-30 rounded-sm"></div>
+         
+         {/* Hover Fill */}
+         <div className="absolute inset-0 bg-[#d4af37] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left ease-out opacity-20"></div>
+
+         <span className="relative text-[#d4af37] font-serif-display text-xl tracking-[0.2em] uppercase group-hover:text-[#f3e5ab] transition-colors">
+            Enter Next Page
          </span>
-         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1/2 h-[1px] bg-rose-500/50 blur-[2px]"></div>
       </button>
     </div>
   );

@@ -1,15 +1,17 @@
 export const CONFESSION_CONTENT = [
-  "Dear You,",
-  "I've been wanting to tell you this for a long time.",
-  "Every time I see you, the world seems to stop just for a second.",
-  "Your smile is my favorite scene, and your voice is my favorite melody.",
-  "I just wanted to let you know...",
-  "I like you. A lot."
+  "My Dearest,",
+  "I have written this letter a thousand times in my mind.",
+  "In this grid of infinite possibilities, you are my only constant.",
+  "Opening this envelope is just the beginning...",
+  "I want to walk through the next chapter with you.",
+  "Will you join me?"
 ];
 
 export const THEME_COLORS = {
-  primary: '#e11d48', // Rose red
-  secondary: '#fbbf24', // Amber gold
-  paper: '#fef3c7', // Amber 100
-  grid: 'rgba(225, 29, 72, 0.4)', // Transparent rose
+  bg: '#1a0505',
+  primary: '#d4af37', // Vintage Gold
+  secondary: '#8b0000', // Deep Red
+  paper: '#f3e5ab', // Parchment
+  grid: 'rgba(212, 175, 55, 0.25)', // Faint Gold
+  gridHighlight: 'rgba(212, 175, 55, 0.6)',
 };
