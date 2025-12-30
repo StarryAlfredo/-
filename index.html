@@ -1,50 +1,380 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>For You</title>
+    <!-- Tailwind CSS for layout utilities -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
     <style>
-      /* Custom font classes to use in Tailwind */
-      .font-handwriting {
-        font-family: 'Dancing Script', cursive;
-      }
-      .font-serif-display {
-        font-family: 'Playfair Display', serif;
-      }
-      body {
-        margin: 0;
-        overflow: hidden;
-        background-color: #1a0505; /* Deep Vintage Burgundy */
-      }
-      .bg-noise {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 50;
-        opacity: 0.07;
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-      }
+        /* --- Global Styles --- */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a0505;
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* --- Fonts --- */
+        .font-handwriting { font-family: 'Dancing Script', cursive; }
+        .font-serif-display { font-family: 'Playfair Display', serif; }
+
+        /* --- Noise Texture --- */
+        .bg-noise {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 50; opacity: 0.07;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* --- 3D Envelope Styles --- */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        
+        .envelope-container {
+            transition: transform 1s ease-in-out;
+        }
+
+        /* State: Envelope Open - Move down */
+        .envelope-wrapper.is-open .envelope-container {
+            transform: translateY(130px);
+        }
+
+        /* Flap Animation */
+        .envelope-flap {
+            transform-origin: top;
+            transition: transform 0.8s ease-in-out, z-index 0.8s;
+            z-index: 30;
+        }
+        .envelope-wrapper.is-open .envelope-flap {
+            transform: rotateX(180deg);
+            z-index: 0;
+        }
+
+        /* Letter Animation */
+        .letter {
+            transition: transform 1.5s ease-out, opacity 1s;
+            transform: translateY(0.5rem); /* Default slightly tucked */
+        }
+        .envelope-wrapper.is-open .letter {
+            transform: translateY(-280px); /* Slide out */
+            transition-delay: 0.6s;
+        }
+
+        /* Seal Animation */
+        .wax-seal {
+            transition: opacity 0.3s;
+        }
+        .envelope-wrapper.is-open .wax-seal {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Button Animation */
+        .next-btn-container {
+            transition: opacity 1s, transform 1s;
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+        }
+        .next-btn-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Helper Classes */
+        .hidden-el { display: none; }
+        .fade-in { animation: fadeIn 1.5s forwards; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* CSS Canvas Background (fallback) */
+        canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -10;
+        }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
-  <body>
+<body>
+    <!-- 1. Background Noise Overlay -->
     <div class="bg-noise"></div>
-    <div id="root"></div>
-  </body>
+
+    <!-- 2. The Canvas Background -->
+    <canvas id="gridCanvas"></canvas>
+
+    <!-- 3. Main Content Wrapper -->
+    <div id="app" class="relative w-full h-screen flex flex-col items-center justify-center">
+        
+        <!-- ENVELOPE SECTION -->
+        <div id="envelopeWrapper" class="envelope-wrapper relative w-[320px] md:w-[500px] h-[220px] md:h-[300px] perspective-1000 select-none mt-24">
+            
+            <div id="envelopeContainer" class="envelope-container relative w-full h-full transform-style-3d cursor-pointer hover:rotate-1 transition-all duration-300">
+                
+                <!-- Back of Envelope -->
+                <div class="absolute inset-0 bg-[#8b5a2b] rounded-md shadow-2xl border border-[#6b4220] z-0"></div>
+
+                <!-- The Letter -->
+                <div class="letter absolute left-2 right-2 md:left-4 md:right-4 bg-[#f3e5ab] shadow-sm z-10 flex flex-col p-6 overflow-hidden h-[90%] md:h-[450px] rounded-sm"
+                     style="background-image: repeating-linear-gradient(transparent, transparent 27px, #d4af37 28px); background-size: 100% 28px; box-shadow: inset 0 0 20px rgba(139, 90, 43, 0.2);">
+                    
+                    <div class="opacity-0 transition-opacity duration-1000 delay-700" id="letterContent">
+                        <p class="font-handwriting text-lg md:text-2xl text-[#4a3b2a] mb-2 leading-[28px]">My Dearest,</p>
+                        <p class="font-handwriting text-lg md:text-2xl text-[#4a3b2a] mb-2 leading-[28px]">I have written this letter a thousand times in my mind.</p>
+                        <p class="font-handwriting text-lg md:text-2xl text-[#4a3b2a] mb-2 leading-[28px]">In this grid of infinite possibilities, you are my only constant.</p>
+                        <p class="font-handwriting text-lg md:text-2xl text-[#4a3b2a] mb-2 leading-[28px]">Opening this envelope is just the beginning...</p>
+                        <p class="font-handwriting text-lg md:text-2xl text-[#4a3b2a] mb-2 leading-[28px]">I want to walk through the next chapter with you.</p>
+                        <p class="font-handwriting text-lg md:text-2xl text-[#4a3b2a] mb-2 leading-[28px]">Will you join me?</p>
+                        <div class="mt-6 text-right font-handwriting text-xl text-[#8b0000]">- Forever Yours</div>
+                    </div>
+                </div>
+
+                <!-- Envelope Front Folds (Static) -->
+                <!-- Left Fold -->
+                <div class="absolute top-0 left-0 w-full h-full z-20 pointer-events-none overflow-hidden rounded-md">
+                    <div class="absolute top-0 left-0 w-0 h-0 border-t-[110px] md:border-t-[150px] border-r-[160px] md:border-r-[250px] border-b-[110px] md:border-b-[150px] border-transparent border-l-[160px] md:border-l-[250px] border-l-[#a06d3a] border-b-[#966333]"></div>
+                </div>
+                <!-- Right Fold -->
+                <div class="absolute top-0 right-0 w-full h-full z-20 pointer-events-none overflow-hidden rounded-md">
+                    <div class="absolute top-0 right-0 w-0 h-0 border-t-[110px] md:border-t-[150px] border-l-[160px] md:border-l-[250px] border-b-[110px] md:border-b-[150px] border-transparent border-r-[160px] md:border-r-[250px] border-r-[#a06d3a] border-b-[#966333]"></div>
+                </div>
+
+                <!-- Top Flap (Animated) -->
+                <div class="envelope-flap absolute top-0 left-0 w-full h-1/2" style="transform-style: preserve-3d;">
+                    <!-- Flap Shape -->
+                    <div class="absolute inset-0 w-full h-full">
+                        <div class="w-0 h-0 border-l-[160px] md:border-l-[250px] border-r-[160px] md:border-r-[250px] border-t-[110px] md:border-t-[150px] border-transparent border-t-[#8b5a2b] filter drop-shadow-lg"></div>
+                    </div>
+                    <!-- Wax Seal -->
+                    <div class="wax-seal absolute top-[80px] md:top-[110px] left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center hover:scale-110 transition-transform duration-200"
+                        style="background: radial-gradient(circle at 30% 30%, #ff4d4d, #8b0000); box-shadow: 0 3px 6px rgba(0,0,0,0.4), 0 0 0 4px rgba(139,0,0,0.3);">
+                        <div class="w-10 h-10 border-2 border-[#ff9999] rounded-full flex items-center justify-center opacity-70">
+                            <span class="text-[#ffcccc] font-serif-display text-xl">♥</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Click Prompt -->
+            <div id="clickPrompt" class="absolute -bottom-16 left-0 w-full text-center transition-opacity duration-300">
+                <p class="font-serif-display text-[#d4af37] text-md tracking-widest opacity-80 animate-bounce">
+                    Click the seal
+                </p>
+            </div>
+        </div>
+
+        <!-- CHAPTER 2 SECTION (Initially Hidden) -->
+        <div id="chapterTwo" class="hidden-el text-center">
+            <h1 class="text-4xl md:text-6xl font-serif-display text-[#f3e5ab] mb-4">Chapter Two</h1>
+            <p class="text-[#d4af37] opacity-80 font-handwriting text-2xl">(To be continued...)</p>
+        </div>
+
+    </div>
+
+    <!-- 4. Next Page Button -->
+    <div id="nextBtnContainer" class="next-btn-container fixed bottom-12 left-0 w-full flex justify-center z-40">
+        <button id="nextBtn" class="group relative px-10 py-4 bg-transparent overflow-hidden transition-all duration-300">
+             <div class="absolute inset-0 border border-[#d4af37] opacity-50 rounded-sm"></div>
+             <div class="absolute inset-[3px] border border-[#d4af37] opacity-30 rounded-sm"></div>
+             <div class="absolute inset-0 bg-[#d4af37] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left ease-out opacity-20"></div>
+             <span class="relative text-[#d4af37] font-serif-display text-xl tracking-[0.2em] uppercase group-hover:text-[#f3e5ab] transition-colors">
+                Enter Next Page
+             </span>
+        </button>
+    </div>
+
+    <!-- --- JAVASCRIPT LOGIC --- -->
+    <script>
+        // --- 1. Canvas Logic (Pure JS) ---
+        class GridRenderer {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.time = 0;
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.animationId = 0;
+                
+                // Colors
+                this.colors = {
+                    bg: '#1a0505',
+                    grid: 'rgba(212, 175, 55, 0.25)',
+                    gridHighlight: 'rgba(212, 175, 55, 0.6)'
+                };
+
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+            }
+
+            resize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+            }
+
+            start() {
+                this.animate();
+            }
+
+            stop() {
+                cancelAnimationFrame(this.animationId);
+            }
+
+            animate() {
+                this.render();
+                this.animationId = requestAnimationFrame(() => this.animate());
+            }
+
+            render() {
+                this.time += 0.015;
+                const ctx = this.ctx;
+                
+                // Clear
+                ctx.fillStyle = this.colors.bg;
+                ctx.fillRect(0, 0, this.width, this.height);
+
+                // Config
+                const fov = 350;
+                const viewY = -150;
+                const gridSize = 60;
+                const rows = 30;
+                const cols = 40;
+                const speed = 80;
+
+                ctx.lineWidth = 1.5;
+                ctx.lineCap = 'round';
+
+                const project = (x, y, z) => {
+                    const scale = fov / (fov + z);
+                    return {
+                        x: (x * scale) + this.width / 2,
+                        y: (y * scale) + this.height / 2
+                    };
+                };
+
+                // Vertical Lines
+                for (let i = -cols; i <= cols; i++) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = i === 0 ? this.colors.gridHighlight : this.colors.grid;
+                    
+                    for (let j = 0; j < rows; j++) {
+                        const z = (j * gridSize) - (this.time * speed) % gridSize + 100;
+                        const x = i * gridSize;
+                        const y = viewY + Math.sin((x + this.time * 200) * 0.002) * 20;
+                        const p = project(x, y, z);
+                        
+                        if (z > 0) {
+                            if (j === 0) ctx.moveTo(p.x, p.y);
+                            else ctx.lineTo(p.x, p.y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+
+                // Horizontal Lines
+                for (let j = 0; j < rows; j++) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = this.colors.grid;
+                    const zBase = (j * gridSize) - (this.time * speed) % gridSize + 100;
+                    if (zBase <= 0) continue;
+
+                    let first = true;
+                    for (let i = -cols; i <= cols; i++) {
+                        const x = i * gridSize;
+                        const y = viewY + Math.sin((x + this.time * 200) * 0.002) * 20;
+                        const p = project(x, y, zBase);
+
+                        if (first) {
+                            ctx.moveTo(p.x, p.y);
+                            first = false;
+                        } else {
+                            ctx.lineTo(p.x, p.y);
+                        }
+                    }
+                    // Fade
+                    const alpha = Math.max(0, 1 - zBase / (rows * gridSize * 0.6));
+                    ctx.globalAlpha = alpha;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+            }
+        }
+
+        // --- 2. Application Orchestration ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Background
+            const canvas = document.getElementById('gridCanvas');
+            const renderer = new GridRenderer(canvas);
+            renderer.start();
+
+            // Elements
+            const envelopeWrapper = document.getElementById('envelopeWrapper');
+            const envelopeContainer = document.getElementById('envelopeContainer');
+            const letterContent = document.getElementById('letterContent');
+            const clickPrompt = document.getElementById('clickPrompt');
+            const nextBtnContainer = document.getElementById('nextBtnContainer');
+            const nextBtn = document.getElementById('nextBtn');
+            const chapterTwo = document.getElementById('chapterTwo');
+
+            let isOpen = false;
+
+            // Interaction: Open Envelope
+            envelopeContainer.addEventListener('click', () => {
+                if (isOpen) return;
+                isOpen = true;
+
+                // UI Updates
+                envelopeWrapper.classList.add('is-open');
+                envelopeContainer.classList.remove('cursor-pointer', 'hover:rotate-1');
+                clickPrompt.style.opacity = '0';
+                
+                // Show text content after slide animation starts
+                setTimeout(() => {
+                    letterContent.classList.remove('opacity-0');
+                    letterContent.classList.add('opacity-100');
+                }, 800);
+
+                // Show Next Button after reading time
+                setTimeout(() => {
+                    nextBtnContainer.classList.add('visible');
+                }, 2000);
+            });
+
+            // Interaction: Next Page
+            nextBtn.addEventListener('click', () => {
+                // Hide Envelope
+                envelopeWrapper.style.transition = 'opacity 1s ease';
+                envelopeWrapper.style.opacity = '0';
+                nextBtnContainer.classList.remove('visible'); // Hide button
+
+                setTimeout(() => {
+                    envelopeWrapper.style.display = 'none';
+                    // Show Chapter Two
+                    chapterTwo.classList.remove('hidden-el');
+                    chapterTwo.classList.add('fade-in');
+                }, 1000);
+            });
+        });
+    </script>
+</body>
 </html>

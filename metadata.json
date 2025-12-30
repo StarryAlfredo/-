@@ -1,5 +1,5 @@
 {
   "name": "Vintage Confession",
-  "description": "A romantic, interactive confession page featuring a retro envelope animation and a flowing canvas background.",
+  "description": "A standalone static HTML/JS confession page featuring a retro envelope animation and a flowing canvas background, ready for GitHub Pages.",
   "requestFramePermissions": []
 }
